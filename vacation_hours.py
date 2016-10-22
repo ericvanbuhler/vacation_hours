@@ -9,6 +9,8 @@ from oauth2client import tools
 
 from datetime import datetime, timedelta, date
 
+import json
+
 try:
     import argparse
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
@@ -21,13 +23,7 @@ SCOPES = 'https://www.googleapis.com/auth/calendar'
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Google Calendar API Vacation Hours'
 
-VACATION_WEEKS_PER_YEAR = 4
 WEEKS_PER_YEAR = 52
-BIWEEKLY_VACATION_HOURS = ((VACATION_WEEKS_PER_YEAR*5*8)/WEEKS_PER_YEAR)*2
-
-
-
-
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -101,15 +97,19 @@ def main():
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
 
+    # Load config from file
+    with open('config.json') as config_file:
+        conf = json.load(config_file)
+
     # Find starting 'Vacation Hours:' event
-    start_year = 2016
-    start_month = 2
-    start_day = 19
+    start_year = conf["start_year"]
+    start_month = conf["start_month"]
+    start_day = conf["start_day"]
     start_datetime = datetime(start_year, start_month, start_day, 0, 0, 0, 0, None)
     
-    end_year = 2016
-    end_month = 7
-    end_day = 11
+    end_year = conf["end_year"]
+    end_month = conf["end_month"]
+    end_day = conf["end_day"]
     end_datetime = datetime(end_year, end_month, end_day, 0, 0, 0, 0, None)
     
     eventsResult = service.events().list(
@@ -137,10 +137,12 @@ def main():
     prev_datetime = (start_datetime + timedelta(days=1))
     new_datetime = (start_datetime + timedelta(days=14))
     new_hours = start_hours
-    
+
+    # Compute vacation housr increment
+    biweekly_vacation_hours = (conf["vacation_days_per_year"]*8/WEEKS_PER_YEAR)*2 
     
     while (new_datetime < end_datetime):
-      new_hours = new_hours + BIWEEKLY_VACATION_HOURS
+      new_hours = new_hours + biweekly_vacation_hours
 
       # Find any vacation days between the last date and the current date
       eventsResult = service.events().list(
